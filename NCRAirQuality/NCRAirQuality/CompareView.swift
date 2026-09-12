@@ -13,13 +13,15 @@ private struct MonthKey: Identifiable, Hashable {
 }
 
 struct CompareView: View {
-    @State private var selectedMonthKey: String
+    @EnvironmentObject private var store: AirQualityStore
+    @State private var selectedMonthKey: String = ""
     @State private var pollutant: Pollutant = .pm25
 
-    private static let allMonths: [MonthKey] = {
+    /// Every year/month present across all cities, newest first.
+    private var allMonths: [MonthKey] {
         var seen = Set<String>()
         var months: [MonthKey] = []
-        for city in AirQualityData.cities {
+        for city in store.cities {
             for r in city.readings {
                 let key = MonthKey(year: r.year, month: r.month)
                 if !seen.contains(key.id) {
@@ -29,14 +31,15 @@ struct CompareView: View {
             }
         }
         return months.sorted { $0.year != $1.year ? $0.year > $1.year : $0.month > $1.month }
-    }()
+    }
 
-    init() {
-        _selectedMonthKey = State(initialValue: Self.allMonths.first?.id ?? "")
+    /// Falls back to the latest available month until the user picks one explicitly.
+    private var effectiveMonthKey: String {
+        selectedMonthKey.isEmpty ? (allMonths.first?.id ?? "") : selectedMonthKey
     }
 
     private var selectedYearMonth: (year: Int, month: Int)? {
-        let parts = selectedMonthKey.split(separator: "-")
+        let parts = effectiveMonthKey.split(separator: "-")
         guard parts.count == 2, let y = Int(parts[0]), let m = Int(parts[1]) else { return nil }
         return (y, m)
     }
@@ -53,7 +56,7 @@ struct CompareView: View {
 
     private var rankings: [CityRanking] {
         guard let ym = selectedYearMonth else { return [] }
-        return AirQualityData.cities.compactMap { city in
+        return store.cities.compactMap { city in
             guard let reading = city.reading(year: ym.year, month: ym.month),
                   let v = value(reading, for: pollutant) else { return nil }
             return CityRanking(id: city.id, value: v)
@@ -62,7 +65,7 @@ struct CompareView: View {
     }
 
     private var unmonitoredCount: Int {
-        AirQualityData.cities.count - rankings.count
+        store.cities.count - rankings.count
     }
 
     var body: some View {
@@ -73,6 +76,8 @@ struct CompareView: View {
 
                     pollutantPicker
 
+                    DataStatusView()
+
                     if rankings.isEmpty {
                         Text("No data for \(monthLabel).")
                             .foregroundStyle(.secondary)
@@ -81,7 +86,7 @@ struct CompareView: View {
                         rankingChart
 
                         if unmonitoredCount > 0 {
-                            Text("\(unmonitoredCount) of \(AirQualityData.cities.count) cities had no station reporting this month.")
+                            Text("\(unmonitoredCount) of \(store.cities.count) cities had no station reporting this month.")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                                 .multilineTextAlignment(.center)
@@ -90,13 +95,16 @@ struct CompareView: View {
                 }
                 .padding()
             }
+            .refreshable {
+                await store.refresh()
+            }
             .navigationTitle("Compare Cities")
         }
     }
 
     private var monthPicker: some View {
         Menu {
-            ForEach(Self.allMonths) { ym in
+            ForEach(allMonths) { ym in
                 Button {
                     selectedMonthKey = ym.id
                 } label: {
@@ -162,4 +170,5 @@ struct CompareView: View {
 
 #Preview {
     CompareView()
+        .environmentObject(AirQualityStore())
 }

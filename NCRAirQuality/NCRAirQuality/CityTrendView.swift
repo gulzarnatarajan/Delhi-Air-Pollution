@@ -2,11 +2,12 @@ import SwiftUI
 import Charts
 
 struct CityTrendView: View {
+    @EnvironmentObject private var store: AirQualityStore
     @State private var selectedCityID: String = "Delhi"
     @State private var pollutant: Pollutant = .pm25
 
     private var city: CityData {
-        AirQualityData.cities.first { $0.id == selectedCityID } ?? AirQualityData.cities[0]
+        store.cities.first { $0.id == selectedCityID } ?? CityData(id: selectedCityID, readings: [])
     }
 
     private var readings: [MonthlyReading] {
@@ -23,6 +24,8 @@ struct CityTrendView: View {
 
                     pollutantPicker
 
+                    DataStatusView()
+
                     if let latest, let latestValue = value(latest, for: pollutant) {
                         latestCard(pmValue: latestValue, monthLabel: latest.fullLabel)
                         trendChart
@@ -33,6 +36,9 @@ struct CityTrendView: View {
                 }
                 .padding()
             }
+            .refreshable {
+                await store.refresh()
+            }
             .navigationTitle("NCR Air Quality")
         }
     }
@@ -41,7 +47,7 @@ struct CityTrendView: View {
 
     private var cityPicker: some View {
         Menu {
-            ForEach(AirQualityData.cities) { c in
+            ForEach(store.cities) { c in
                 Button {
                     selectedCityID = c.id
                 } label: {
@@ -178,4 +184,5 @@ struct CityTrendView: View {
 
 #Preview {
     CityTrendView()
+        .environmentObject(AirQualityStore())
 }

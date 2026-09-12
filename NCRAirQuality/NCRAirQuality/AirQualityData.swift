@@ -499,4 +499,8 @@ enum AirQualityData {
             MonthlyReading(year: 2026, month: 8, pm25: 13.0, pm10: 36.0),
         ]),
     ]
+
+    /// Canonical city order, so the picker always lists all 16 NCR cities — even one
+    /// with no rows yet in a live data source — in this familiar order.
+    static let knownCityOrder: [String] = cities.map(\.id)
 }

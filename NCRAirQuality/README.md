@@ -26,16 +26,49 @@ instead of a blank or misleading chart.
 
 ## Data
 
-Source: `PM_2.5_10_Data_Analysis_v2_1.xlsx`, monthly average PM2.5 / PM10
-(µg/m³) for Delhi, Noida, Greater Noida, Ghaziabad, Gurugram, Faridabad,
-Sonipat, Bhiwadi, Neemrana, Manesar, Karnal, Rohtak, Panipat, Meerut, Alwar,
-and Bharatpur — January 2024 through August 2026.
+The app can show data two ways:
 
-The data is baked into the app as Swift code
-(`NCRAirQuality/AirQualityData.swift`), so the app works fully offline with
-no backend or network calls. To refresh it with a newer spreadsheet, re-run
-the same extraction shape: one `CityData` per city, one `MonthlyReading`
-per available month, `nil` for months with no recorded value.
+1. **Bundled sample data** (`AirQualityData.swift`) — originally extracted
+   from `PM_2.5_10_Data_Analysis_v2_1.xlsx`: monthly average PM2.5 / PM10
+   (µg/m³) for Delhi, Noida, Greater Noida, Ghaziabad, Gurugram, Faridabad,
+   Sonipat, Bhiwadi, Neemrana, Manesar, Karnal, Rohtak, Panipat, Meerut,
+   Alwar, and Bharatpur — January 2024 through August 2026. This is always
+   there as a fallback, so the app never shows a blank screen.
+2. **Live data from a published Google Sheet CSV link** — see below. Once
+   configured, this takes over automatically; the bundled data is only used
+   until the first successful fetch, and again if a later fetch fails (e.g.
+   no signal).
+
+### Connecting a live, continuously-updated data source
+
+`AirQualityStore.swift` handles fetching, parsing, and offline caching.
+To point it at your own data:
+
+1. **Set up a Google Sheet** with one row per city per month, columns in
+   any order but named exactly (case-insensitive): `City, Year, Month,
+   PM25, PM10`. Leave `PM25`/`PM10` blank for a month with no reading.
+
+   | City | Year | Month | PM25 | PM10 |
+   |---|---|---|---|---|
+   | Delhi | 2024 | 1 | 206 | 330 |
+   | Delhi | 2024 | 2 | 135 | 246 |
+   | Noida | 2024 | 1 | 162 | 270 |
+
+2. **Publish it**: File → Share → Publish to web → select the sheet →
+   format "Comma-separated values (.csv)" → Publish. Copy the link you get.
+3. **Paste that link** into `AirQualityStore.swift`, replacing the
+   placeholder:
+   ```swift
+   static let remoteCSVURLString = "PASTE_YOUR_PUBLISHED_GOOGLE_SHEET_CSV_LINK_HERE"
+   ```
+4. Rebuild and run. The app fetches this link on launch and whenever the
+   user pulls to refresh, then caches the result so it still works offline
+   afterward. A small caption under the pickers on each screen shows when
+   the data was last updated, or explains why it's showing sample data.
+
+Any city name not already in the app's known 16-city list is appended
+automatically — no code change needed to add a 17th city later, as long as
+its rows use the same column format.
 
 Category bands (Good/Satisfactory/Moderate/Poor/Very Poor/Severe) follow
 India's CPCB AQI breakpoints for PM2.5 and PM10. Those breakpoints are
@@ -68,7 +101,9 @@ NCRAirQuality/
     ├── CityTrendView.swift           # Per-city trend screen
     ├── CompareView.swift             # Cross-city ranking screen
     ├── AirQualityCategory.swift      # CPCB-based category bands + colors
-    ├── AirQualityData.swift          # Generated dataset (16 cities)
+    ├── AirQualityData.swift          # Bundled sample dataset (16 cities)
+    ├── AirQualityStore.swift         # Fetches/caches live data; fallback to sample data
+    ├── DataStatusView.swift          # "Updated Xm ago" / error caption
     ├── MonthlyReading+Display.swift  # Date/label helpers
     ├── Assets.xcassets
     └── Info.plist

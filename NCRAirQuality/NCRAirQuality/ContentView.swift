@@ -1,6 +1,8 @@
 import SwiftUI
 
 struct ContentView: View {
+    @EnvironmentObject private var store: AirQualityStore
+
     var body: some View {
         TabView {
             CityTrendView()
@@ -13,9 +15,13 @@ struct ContentView: View {
                     Label("Compare", systemImage: "chart.bar")
                 }
         }
+        .task {
+            await store.refresh()
+        }
     }
 }
 
 #Preview {
     ContentView()
+        .environmentObject(AirQualityStore())
 }
